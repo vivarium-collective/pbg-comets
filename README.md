@@ -174,12 +174,13 @@ The bridge pattern: on each `update(state, interval)`, the Process solves FBA pe
 python demo/demo_report.py
 ```
 
-Runs **six** configurations and opens an interactive HTML report (`demo/report.html`) in Safari:
+Runs **three canonical COMETS benchmarks** and opens an interactive HTML report (`demo/report.html`) in Safari:
 
-- Three **well-mixed** dFBA examples — monoculture on glucose, two-species competition, and cross-feeding — shown with Plotly time-series charts for biomass, community composition, growth rates, and media.
-- Three **spatial** dFBA examples on a 25×25 lattice — single-colony spreading, spatial two-colony competition, and spatial cross-feeding — each rendered as a **2D heatmap animation** (toggle between species biomass and metabolite fields, scrub with a time slider, play/pause) plus Plotly aggregate charts.
+1. **Virtual test tube** — well-mixed batch fermentation with mixed-acid overflow and acetate reuptake, reproducing the three physiological phases highlighted by Dukovski et al. (2021, Fig. 2).
+2. **Virtual petri dish** — single-species colony expansion on a 30×30 lattice, showing the classic Fisher-Kolmogorov travelling wavefront (Dukovski 2021, Box 1).
+3. **Harcombe-style cross-feeding mutualism** — two line-inoculum strains on a 30×30 lattice: a glucose consumer on the left ferments acetate under O₂ limitation, which diffuses rightward and feeds an acetate-specialist strain on the right.
 
-Every section also includes a colored bigraph architecture diagram and a collapsible view of the full PBG composite document.
+Each spatial section renders a **2D heatmap animation** (toggle between species biomass and metabolite fields, scrub with a time slider, play/pause) plus Plotly aggregate charts. Every section also includes a colored bigraph architecture diagram and a collapsible view of the full PBG composite document.
 
 ## Tests
 

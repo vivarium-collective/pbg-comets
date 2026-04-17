@@ -58,94 +58,43 @@ _BASE_MEDIA = {
 
 CONFIGS: List[Dict[str, Any]] = [
     {
-        'id': 'monoculture',
-        'title': 'E. coli Monoculture on Glucose',
-        'subtitle': 'Single-species batch growth with overflow metabolism',
+        'id': 'testtube',
+        'title': 'Virtual Test Tube — Mixed-Acid Fermentation and Acetate Reuptake',
+        'subtitle': 'Canonical COMETS batch-fermentation benchmark (Dukovski 2021, Fig. 2)',
         'description': (
-            'A single population of E. coli (core model) is grown in batch '
-            'on 15 mmol glucose under oxygen-limited conditions. Overflow '
-            'metabolism drives acetate secretion while glucose is being '
-            'consumed. After glucose depletion the culture enters a '
-            'stationary phase with residual acetate in the medium.'
+            'The classic COMETS well-mixed batch experiment: a single E. coli '
+            'inoculum is grown in a test tube of defined media containing '
+            'glucose under oxygen-limited conditions. The simulation '
+            'reproduces three sequential physiological phases that '
+            'COMETS highlights in the literature: (1) rapid exponential '
+            'growth on glucose with overflow metabolism — acetate is '
+            'secreted as a fermentation byproduct; (2) glucose depletion '
+            'and an inflection in the growth curve; (3) acetate reuptake '
+            'once glucose runs out and a final slow-respiration phase. '
+            'All three are visible in the biomass and media panels below.'
         ),
         'dfba_config': {
             'models': ['textbook'],
             'model_ids': ['E_coli'],
-            'initial_biomass': [5e-4],
-            'initial_media': {**_BASE_MEDIA, 'glc__D': 15.0, 'o2': 10.0, 'ac': 0.0},
+            'initial_biomass': [3e-4],
+            # Large O2 pool so the culture can switch to aerobic respiration
+            # once glucose is gone and re-consume the fermentation acetate.
+            'initial_media': {**_BASE_MEDIA, 'glc__D': 10.0, 'o2': 80.0, 'ac': 0.0},
             'volume': 1.0,
             'default_vmax': 10.0,
             'default_km': 0.01,
-            'vmax_overrides': {'o2': 10.0},
-            'substep': 0.1,
-        },
-        'total_time': 12.0,
-        'n_snapshots': 60,
-        'color_scheme': 'indigo',
-        'tracked_media': ['glc__D', 'ac', 'etoh', 'for', 'o2', 'lac__D'],
-    },
-    {
-        'id': 'competition',
-        'title': 'Two-Species Competition for Glucose',
-        'subtitle': 'Identical E. coli strains with different initial biomass',
-        'description': (
-            'Two E. coli populations compete for the same glucose pool. '
-            'The "minor" strain starts at 10% of the biomass of the "major" '
-            'strain. Because the models are identical and growth is '
-            'exponential, the minor strain never catches up — a Lotka-'
-            'Volterra-style competitive exclusion dynamic where both '
-            'strains grow until the shared substrate is exhausted.'
-        ),
-        'dfba_config': {
-            'models': ['textbook', 'textbook'],
-            'model_ids': ['E_major', 'E_minor'],
-            'initial_biomass': [1e-3, 1e-4],
-            'initial_media': {**_BASE_MEDIA, 'glc__D': 10.0, 'o2': 20.0, 'ac': 0.0},
-            'volume': 1.0,
-            'default_vmax': 10.0,
-            'default_km': 0.02,
-            'vmax_overrides': {'o2': 20.0},
-            'substep': 0.1,
-        },
-        'total_time': 8.0,
-        'n_snapshots': 60,
-        'color_scheme': 'emerald',
-        'tracked_media': ['glc__D', 'ac', 'etoh', 'o2', 'for', 'lac__D'],
-    },
-    {
-        'id': 'crossfeeding',
-        'title': 'Cross-Feeding: Glucose Producer + Acetate Consumer',
-        'subtitle': 'Commensal two-species interaction on a shared pool',
-        'description': (
-            'Two E. coli populations with engineered exchange bounds: the '
-            'glucose consumer (E_glc) grows on glucose and secretes '
-            'acetate under oxygen-limited conditions; the acetate consumer '
-            '(E_ac) cannot eat glucose but has its acetate uptake opened '
-            'and grows on the acetate waste. The result is sequential '
-            'resource use — classic cross-feeding — producing a double '
-            'inflection in the total biomass curve.'
-        ),
-        'dfba_config': {
-            'models': ['textbook', 'textbook'],
-            'model_ids': ['E_glc', 'E_ac'],
-            'initial_biomass': [5e-4, 5e-4],
-            'initial_media': {**_BASE_MEDIA, 'glc__D': 15.0, 'o2': 8.0, 'ac': 0.0},
-            'volume': 1.0,
-            'default_vmax': 10.0,
-            'default_km': 0.01,
-            'vmax_overrides': {'o2': 8.0, 'ac': 5.0},
+            'vmax_overrides': {'o2': 12.0, 'ac': 8.0},
+            # Open acetate exchange so the Michaelis-Menten kinetics can
+            # drive reuptake once the medium is rich in acetate.
             'bound_overrides': {
-                'E_ac': {
-                    'glc__D': [0.0, 1000.0],   # block glucose uptake
-                    'ac': [-1000.0, 1000.0],   # open acetate uptake
-                },
+                'E_coli': {'ac': [-1000.0, 1000.0]},
             },
             'substep': 0.1,
         },
-        'total_time': 18.0,
+        'total_time': 22.0,
         'n_snapshots': 90,
-        'color_scheme': 'rose',
-        'tracked_media': ['glc__D', 'ac', 'etoh', 'o2', 'for', 'lac__D'],
+        'color_scheme': 'indigo',
+        'tracked_media': ['glc__D', 'ac', 'etoh', 'for', 'o2'],
     },
 ]
 
@@ -170,111 +119,97 @@ def _unit_salts(overrides=None):
 
 SPATIAL_CONFIGS: List[Dict[str, Any]] = [
     {
-        'id': 'colony',
-        'title': 'Single-Species Colony Spreading',
-        'subtitle': 'A bacterial colony expanding over a uniform nutrient field',
+        'id': 'petri',
+        'title': 'Virtual Petri Dish — Fisher-Kolmogorov Colony Expansion',
+        'subtitle': 'Radial growth wave on a uniform glucose field (Dukovski 2021, Box 1)',
         'description': (
-            'A single E. coli inoculum is placed at the center of a 25×25 '
-            'lattice of 0.04 cm cells (1 cm² total). Each cell holds an '
-            'initial pool of glucose and oxygen. Biomass diffuses very '
-            'slowly (keeping the colony spatially compact) while glucose '
-            'and acetate diffuse about 400× faster. A growing colony '
-            'depletes its local substrate, and the nutrient gradient drives '
-            'the classic COMETS radially-expanding growth front.'
+            'The canonical COMETS spatial benchmark: a single E. coli '
+            'inoculum is placed at the center of a 30×30 agar-plate '
+            'lattice seeded with a uniform glucose background. With very '
+            'slow biomass diffusion and faster metabolite diffusion, the '
+            'colony forms a <em>Fisher-Kolmogorov travelling wave</em> — a '
+            'sharp, radially-symmetric growth front that advances outward '
+            'at constant speed. At the wavefront local glucose drops '
+            'while interior cells reach carrying capacity. This is the '
+            'figure that opens the COMETS Nature Protocols tutorial.'
         ),
         'spatial_config': {
             'models': ['textbook'],
             'model_ids': ['E_coli'],
-            'initial_placement': {'E_coli': [[12, 12, 8e-5]]},
-            'initial_media': _unit_salts({'glc__D': 0.8, 'o2': 8.0, 'ac': 0.0}),
-            'grid': [25, 25],
-            'space_width': 0.04,
-            'biomass_diffusion': 3e-8,
-            'media_diffusion': 1.5e-5,
-            'vmax_overrides': {'o2': 20.0},
+            'initial_placement': {'E_coli': [[15, 15, 5e-5]]},
+            'initial_media': _unit_salts({'glc__D': 0.8, 'o2': 10.0, 'ac': 0.0}),
+            'grid': [30, 30],
+            'space_width': 0.035,
+            # Slow biomass diffusion keeps the colony compact with a sharp
+            # travelling wavefront (bacteria do not freely swim in agar).
+            'biomass_diffusion': 2e-8,
+            # Faster media diffusion lets glucose gradients form around
+            # the advancing colony edge.
+            'media_diffusion': 2e-5,
+            'vmax_overrides': {'o2': 25.0},
             'substep': 0.25,
         },
-        'total_time': 14.0,
+        'total_time': 12.0,
         'n_snapshots': 40,
         'color_scheme': 'indigo',
         'tracked_media': ['glc__D', 'ac'],
     },
     {
-        'id': 'sp_competition',
-        'title': 'Spatial Two-Colony Competition',
-        'subtitle': 'Two colonies contacting across a shared nutrient field',
+        'id': 'harcombe',
+        'title': 'Cross-Feeding Community — Obligate Mutualism',
+        'subtitle': 'Harcombe-style spatial mutualism: acetate-producer + acetate-consumer',
         'description': (
-            'Two identical E. coli populations are inoculated at opposite '
-            'edges of a 25×25 lattice and grow toward each other through a '
-            'uniform glucose-and-oxygen field. Each colony depletes '
-            'glucose locally; once the advancing fronts meet, the '
-            'competing populations form a spatial "no-grow zone" where '
-            'substrate is gone. Total biomass and the spatial niche '
-            'partitioning are visible in the 2D viewer below.'
-        ),
-        'spatial_config': {
-            'models': ['textbook', 'textbook'],
-            'model_ids': ['E_left', 'E_right'],
-            'initial_placement': {
-                'E_left':  [[5,  12, 8e-5]],
-                'E_right': [[19, 12, 8e-5]],
-            },
-            'initial_media': _unit_salts({'glc__D': 0.6, 'o2': 8.0, 'ac': 0.0}),
-            'grid': [25, 25],
-            'space_width': 0.04,
-            'biomass_diffusion': 4e-8,
-            'media_diffusion': 1.2e-5,
-            'vmax_overrides': {'o2': 20.0},
-            'substep': 0.25,
-        },
-        'total_time': 14.0,
-        'n_snapshots': 40,
-        'color_scheme': 'emerald',
-        'tracked_media': ['glc__D', 'ac'],
-    },
-    {
-        'id': 'sp_crossfeed',
-        'title': 'Spatial Cross-Feeding',
-        'subtitle': 'Acetate secreted by a central colony feeds a peripheral ring',
-        'description': (
-            'A glucose consumer (E_glc) is placed at the center of a 25×25 '
-            'lattice. Oxygen is limited, so E_glc secretes acetate as a '
-            'fermentation byproduct. Four acetate-specialist colonies '
-            '(E_ac) are seeded at the lattice corners: they cannot eat '
-            'glucose but have acetate uptake opened. As acetate diffuses '
-            'from the center, the corner colonies light up — a classic '
-            'spatial commensalism pattern driven entirely by local FBA and '
-            'cross-feeding.'
+            'Inspired by Harcombe et al. (2014, <em>Cell Reports</em>) and '
+            'the multi-species COMETS examples in Dukovski 2021, this '
+            'simulation seeds two E. coli variants with complementary '
+            'metabolic capabilities:\n\n'
+            '<strong>E_glc</strong> — placed as a line inoculum down the '
+            'left edge — consumes glucose and ferments it to acetate '
+            'under oxygen-limited conditions. It cannot grow on acetate.\n\n'
+            '<strong>E_ac</strong> — placed as a line inoculum down the '
+            'right edge — has its glucose uptake blocked and its acetate '
+            'uptake opened. It has its own abundant oxygen supply and '
+            'therefore grows whenever acetate reaches it.\n\n'
+            'As the glucose line invades the plate rightward, acetate '
+            'diffuses ahead of the colony front and lights up the E_ac '
+            'line. The stoichiometric coupling between the two strains '
+            'is visible as layered growth bands — a signature '
+            'pattern of cross-feeding mutualisms in COMETS.'
         ),
         'spatial_config': {
             'models': ['textbook', 'textbook'],
             'model_ids': ['E_glc', 'E_ac'],
             'initial_placement': {
-                'E_glc': [[12, 12, 2e-3]],
-                'E_ac':  [[6, 12, 1e-4], [18, 12, 1e-4], [12, 6, 1e-4], [12, 18, 1e-4]],
+                # Line inoculum along the left edge
+                'E_glc': [[1, y, 6e-4] for y in range(4, 26, 2)],
+                # Line inoculum along the right edge
+                'E_ac':  [[28, y, 6e-4] for y in range(4, 26, 2)],
             },
-            'initial_media': _unit_salts({'glc__D': 0.5, 'o2': 3.0, 'ac': 0.0}),
-            'grid': [25, 25],
-            'space_width': 0.04,
-            'biomass_diffusion': 3e-8,
-            'media_diffusion': 3e-5,
-            'diffusion_overrides': {'ac': 5e-5},
-            # Globally, default vmax=10; per-species kinetic overrides let
-            # the glucose consumer be O2-limited (forcing overflow / acetate
-            # secretion) while the acetate consumer has abundant O2 uptake.
+            'initial_media': _unit_salts({'glc__D': 0.6, 'o2': 3.5, 'ac': 0.0}),
+            'grid': [30, 30],
+            'space_width': 0.035,
+            'biomass_diffusion': 2e-8,
+            # Acetate diffuses ~2× faster than glucose in the simulation —
+            # this is what makes the cross-feeding signal reach E_ac
+            # before the glucose colony physically arrives.
+            'media_diffusion': 1.5e-5,
+            'diffusion_overrides': {'ac': 3e-5},
+            # Per-species kinetics: E_glc is O2-limited (forces fermentation
+            # and acetate secretion); E_ac has abundant O2 for respiring
+            # acetate.
             'per_species_vmax': {
                 'E_glc': {'o2': 4.0, 'glc__D': 10.0},
-                'E_ac':  {'o2': 20.0, 'ac': 8.0},
+                'E_ac':  {'o2': 25.0, 'ac': 10.0},
             },
             'bound_overrides': {
                 'E_ac': {
-                    'glc__D': [0.0, 1000.0],
-                    'ac': [-1000.0, 1000.0],
+                    'glc__D': [0.0, 1000.0],     # blocked
+                    'ac': [-1000.0, 1000.0],     # opened
                 },
             },
             'substep': 0.25,
         },
-        'total_time': 20.0,
+        'total_time': 18.0,
         'n_snapshots': 45,
         'color_scheme': 'rose',
         'tracked_media': ['glc__D', 'ac', 'o2'],
@@ -681,12 +616,14 @@ def _spatial_section_html(idx, cfg, snapshots, runtime, all_js_data):
     {field_buttons_html}
   </div>
   <div class="heat-viewer-wrap">
-    <canvas id="heat-{sid}" class="heat-canvas"></canvas>
-    <div class="heat-colorbar">
-      <div class="cb-title"><span id="cb-title-{sid}">biomass</span></div>
-      <div class="cb-val" id="cb-max-{sid}">1.00</div>
-      <div class="cb-gradient" id="cb-grad-{sid}"></div>
-      <div class="cb-val" id="cb-min-{sid}">0.00</div>
+    <div class="heat-canvas-box">
+      <canvas id="heat-{sid}" class="heat-canvas"></canvas>
+      <div class="heat-colorbar">
+        <div class="cb-title"><span id="cb-title-{sid}">biomass</span></div>
+        <div class="cb-val" id="cb-max-{sid}">1.00</div>
+        <div class="cb-gradient" id="cb-grad-{sid}"></div>
+        <div class="cb-val" id="cb-min-{sid}">0.00</div>
+      </div>
     </div>
     <div class="slider-controls">
       <button class="play-btn" style="border-color:{cs['primary']}; color:{cs['primary']};"
@@ -951,38 +888,40 @@ body {{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-seri
 .field-btn:hover {{ transform:translateY(-1px); }}
 .field-btn.active {{ background:currentColor; }}
 .field-btn.active {{ color:#fff !important; }}
-.heat-viewer-wrap {{ position:relative; background:#0f172a; border:1px solid #e2e8f0;
-                     border-radius:14px; overflow:hidden; margin-bottom:1rem; }}
-.heat-canvas {{ width:100%; height:460px; display:block;
+.heat-viewer-wrap {{ position:relative; background:#ffffff;
+                     border:1px solid #e2e8f0; border-radius:14px;
+                     padding:1.5rem; margin-bottom:1rem;
+                     display:flex; flex-direction:column; align-items:center; }}
+.heat-canvas-box {{ position:relative; }}
+.heat-canvas {{ display:block; border-radius:6px;
+                box-shadow:0 1px 3px rgba(15,23,42,0.06);
                 image-rendering:pixelated; image-rendering:crisp-edges; }}
-.heat-colorbar {{ position:absolute; top:.8rem; right:.8rem;
-                  background:rgba(255,255,255,.94); border:1px solid #e2e8f0;
-                  border-radius:8px; padding:.6rem;
-                  display:flex; flex-direction:column; align-items:center; gap:.2rem;
-                  backdrop-filter:blur(4px); }}
+.heat-colorbar {{ position:absolute; top:.5rem; right:-4.2rem;
+                  background:#fff; border:1px solid #e2e8f0; border-radius:8px;
+                  padding:.6rem;
+                  display:flex; flex-direction:column; align-items:center; gap:.2rem; }}
 @media(max-width:900px) {{
   .charts-row, .pbg-row {{ grid-template-columns:1fr; }}
   .sim-section, .page-header, .section-banner {{ padding:1.5rem; }}
 }}
-/* Slider controls reuse */
-.slider-controls {{ position:absolute; bottom:0; left:0; right:0;
-                    background:linear-gradient(transparent,rgba(15,23,42,.86));
-                    padding:1.5rem 1.5rem 1rem; display:flex;
-                    align-items:center; gap:.8rem; color:#e2e8f0; }}
-.slider-controls label {{ font-size:.8rem; color:#cbd5e1; }}
+/* Slider controls — light theme, sits beneath the centered canvas */
+.slider-controls {{ margin-top:1rem; padding:.6rem 1rem;
+                    background:#f8fafc; border:1px solid #e2e8f0;
+                    border-radius:10px; display:flex;
+                    align-items:center; gap:.8rem; color:#334155;
+                    width:100%; max-width:560px; }}
+.slider-controls label {{ font-size:.8rem; color:#64748b; }}
 .time-slider {{ flex:1; height:5px; }}
-.time-val {{ font-size:.95rem; font-weight:600; color:#f8fafc; min-width:110px;
-             text-align:right; }}
-.play-btn {{ background:#fff; border:1.5px solid; padding:.3rem .8rem;
+.time-val {{ font-size:.9rem; font-weight:600; color:#0f172a; min-width:110px;
+             text-align:right; font-variant-numeric:tabular-nums; }}
+.play-btn {{ background:#fff; border:1.5px solid; padding:.35rem 1rem;
              border-radius:7px; cursor:pointer; font-size:.8rem; font-weight:600;
              transition:all .15s; }}
-.play-btn:hover {{ transform:scale(1.05); }}
+.play-btn:hover {{ transform:scale(1.03); box-shadow:0 2px 6px rgba(0,0,0,.06); }}
 .cb-title {{ font-size:.62rem; text-transform:uppercase; letter-spacing:.04em;
              color:#475569; font-weight:600; }}
-.cb-val {{ font-size:.7rem; color:#334155; }}
-.cb-gradient {{ width:18px; height:90px; border-radius:3px;
-  background:linear-gradient(to bottom,
-    #fde047, #f97316, #dc2626, #7c3aed, #1e40af, #0f172a); }}
+.cb-val {{ font-size:.7rem; color:#334155; font-variant-numeric:tabular-nums; }}
+.cb-gradient {{ width:16px; height:90px; border-radius:3px; }}
 </style>
 </head>
 <body>
@@ -992,11 +931,13 @@ body {{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-seri
   <span class="tag">Dynamic FBA</span>
   <span class="tag">process-bigraph</span>
   <h1>COMETS-Style Community Simulation Report</h1>
-  <p>Three microbial community simulations wrapped as <strong>process-bigraph</strong>
-  Processes via <code>DynamicFBAProcess</code>, a pure-Python dFBA
-  implementation built on <code>cobra</code>. Each configuration illustrates
-  a distinct ecological scenario (monoculture, competition, cross-feeding)
-  with interactive time-series visualizations.</p>
+  <p>Three canonical COMETS-literature benchmarks wrapped as
+  <strong>process-bigraph</strong> Processes: the virtual test tube
+  (mixed-acid fermentation with acetate reuptake), the virtual petri
+  dish (Fisher-Kolmogorov colony expansion), and a Harcombe-style
+  cross-feeding mutualism. Built on <code>cobra</code> FBA plus an
+  explicit 5-point Laplacian diffusion step; see Dukovski et al.,
+  <em>Nature Protocols</em> 16, 5030–5082 (2021).</p>
 </div>
 
 <div class="nav">{nav_items}</div>
@@ -1206,8 +1147,9 @@ function drawHeatmap(sid) {{
   const canvas = document.getElementById('heat-' + sid);
   if (!canvas) return;
   const [nx, ny] = d.grid;
-  // Pixel-scale: fit nicely into 460px height
-  const cellPx = Math.floor(460 / ny);
+  // Fit the heatmap into a square ~460x460 box, centered in its container.
+  const target = 460;
+  const cellPx = Math.max(4, Math.floor(target / Math.max(nx, ny)));
   const W = nx * cellPx;
   const H = ny * cellPx;
   canvas.width = W * window.devicePixelRatio;
