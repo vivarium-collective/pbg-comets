@@ -91,8 +91,8 @@ CONFIGS: List[Dict[str, Any]] = [
             },
             'substep': 0.1,
         },
-        'total_time': 22.0,
-        'n_snapshots': 90,
+        'total_time': 30.0,
+        'n_snapshots': 120,
         'color_scheme': 'indigo',
         'tracked_media': ['glc__D', 'ac', 'etoh', 'for', 'o2'],
     },
@@ -136,9 +136,9 @@ SPATIAL_CONFIGS: List[Dict[str, Any]] = [
         'spatial_config': {
             'models': ['textbook'],
             'model_ids': ['E_coli'],
-            'initial_placement': {'E_coli': [[15, 15, 5e-5]]},
-            'initial_media': _unit_salts({'glc__D': 0.8, 'o2': 10.0, 'ac': 0.0}),
-            'grid': [30, 30],
+            'initial_placement': {'E_coli': [[20, 20, 5e-5]]},
+            'initial_media': _unit_salts({'glc__D': 0.7, 'o2': 10.0, 'ac': 0.0}),
+            'grid': [40, 40],
             'space_width': 0.035,
             # Slow biomass diffusion keeps the colony compact with a sharp
             # travelling wavefront (bacteria do not freely swim in agar).
@@ -147,10 +147,10 @@ SPATIAL_CONFIGS: List[Dict[str, Any]] = [
             # the advancing colony edge.
             'media_diffusion': 2e-5,
             'vmax_overrides': {'o2': 25.0},
-            'substep': 0.25,
+            'substep': 0.3,
         },
-        'total_time': 12.0,
-        'n_snapshots': 40,
+        'total_time': 24.0,
+        'n_snapshots': 60,
         'color_scheme': 'indigo',
         'tracked_media': ['glc__D', 'ac'],
     },
@@ -181,12 +181,12 @@ SPATIAL_CONFIGS: List[Dict[str, Any]] = [
             'model_ids': ['E_glc', 'E_ac'],
             'initial_placement': {
                 # Line inoculum along the left edge
-                'E_glc': [[1, y, 6e-4] for y in range(4, 26, 2)],
+                'E_glc': [[1, y, 5e-4] for y in range(4, 37, 2)],
                 # Line inoculum along the right edge
-                'E_ac':  [[28, y, 6e-4] for y in range(4, 26, 2)],
+                'E_ac':  [[38, y, 5e-4] for y in range(4, 37, 2)],
             },
-            'initial_media': _unit_salts({'glc__D': 0.6, 'o2': 3.5, 'ac': 0.0}),
-            'grid': [30, 30],
+            'initial_media': _unit_salts({'glc__D': 0.55, 'o2': 3.5, 'ac': 0.0}),
+            'grid': [40, 40],
             'space_width': 0.035,
             'biomass_diffusion': 2e-8,
             # Acetate diffuses ~2× faster than glucose in the simulation —
@@ -207,10 +207,10 @@ SPATIAL_CONFIGS: List[Dict[str, Any]] = [
                     'ac': [-1000.0, 1000.0],     # opened
                 },
             },
-            'substep': 0.25,
+            'substep': 0.3,
         },
-        'total_time': 18.0,
-        'n_snapshots': 45,
+        'total_time': 30.0,
+        'n_snapshots': 60,
         'color_scheme': 'rose',
         'tracked_media': ['glc__D', 'ac', 'o2'],
     },
@@ -275,12 +275,37 @@ def run_spatial_simulation(cfg_entry: Dict[str, Any]):
     return snapshots, runtime
 
 
+def _round_grid(grid, digits=5, tiny=1e-14):
+    """Round a 2D nested list to ``digits`` decimals; snap near-zero to 0.
+
+    Dramatically shrinks JSON size and removes diffusion numerical noise.
+    """
+    out = []
+    for row in grid:
+        out_row = []
+        for v in row:
+            if abs(v) < tiny:
+                out_row.append(0)
+            else:
+                out_row.append(round(v, digits))
+        out.append(out_row)
+    return out
+
+
 def _spatial_snap(t: float, state: Dict[str, Any],
                   tracked_media: List[str]) -> Dict[str, Any]:
-    """Package a spatial state into a JSON-serializable snapshot."""
+    """Package a spatial state into a JSON-serializable snapshot.
+
+    Float values in the 2D fields are rounded to 5 decimals and near-zero
+    cells are zeroed out, which keeps the snapshot JSON compact at 40×40.
+    """
     media_grid = {
-        k: state['media_grid'][k]
+        k: _round_grid(state['media_grid'][k])
         for k in tracked_media if k in state['media_grid']
+    }
+    biomass_grid = {
+        sid: _round_grid(field, digits=7, tiny=1e-14)
+        for sid, field in state['biomass_grid'].items()
     }
     return {
         'time': float(t),
@@ -289,7 +314,7 @@ def _spatial_snap(t: float, state: Dict[str, Any],
                   if k in state['media']},
         'growth_rates': dict(state['growth_rates']),
         'total_biomass': float(state['total_biomass']),
-        'biomass_grid': dict(state['biomass_grid']),
+        'biomass_grid': biomass_grid,
         'media_grid': media_grid,
     }
 
@@ -476,6 +501,55 @@ MEDIA_PALETTE   = ['#6366f1', '#10b981', '#f43f5e', '#f59e0b', '#0ea5e9',
                    '#a855f7', '#14b8a6', '#eab308']
 
 
+def _fmt_sci(v: float) -> str:
+    """Compact formatter for colorbar labels."""
+    if v == 0:
+        return '0'
+    if abs(v) < 0.01 or abs(v) >= 1000:
+        return f'{v:.2e}'
+    return f'{v:.3g}'
+
+
+_BIOMASS_STOPS_RGB = [
+    (0.961, 0.969, 0.992),   # near-white
+    (0.765, 0.780, 0.949),
+    (0.489, 0.517, 0.886),
+    (0.353, 0.307, 0.761),
+    (0.655, 0.241, 0.682),
+    (0.918, 0.310, 0.278),
+    (0.992, 0.647, 0.153),
+    (0.996, 0.902, 0.278),
+]
+
+
+_MEDIA_STOPS_RGB = [
+    (0.973, 0.988, 0.996),
+    (0.753, 0.902, 0.945),
+    (0.408, 0.784, 0.851),
+    (0.086, 0.569, 0.686),
+    (0.051, 0.333, 0.537),
+    (0.031, 0.184, 0.376),
+]
+
+
+def _css_gradient(stops):
+    """Return a CSS linear-gradient stop string from RGB tuples."""
+    n = len(stops)
+    parts = []
+    for i, (r, g, b) in enumerate(stops):
+        pct = i / (n - 1) * 100
+        parts.append(f'rgb({int(r*255)},{int(g*255)},{int(b*255)}) {pct:.0f}%')
+    return ', '.join(parts)
+
+
+def _biomass_css_gradient():
+    return _css_gradient(_BIOMASS_STOPS_RGB)
+
+
+def _media_css_gradient():
+    return _css_gradient(_MEDIA_STOPS_RGB)
+
+
 def _spatial_field_stats(snapshots, field_key, subkey):
     """Return [vmin, vmax] (2-98 percentile) for a spatial field across snapshots."""
     import numpy as np
@@ -565,21 +639,44 @@ def _spatial_section_html(idx, cfg, snapshots, runtime, all_js_data):
         for i, sp in enumerate(species_ids)
     )
 
-    # Buttons to toggle which field is displayed in the 2D viewer
-    field_buttons = []
+    # Build one small labeled heatmap panel per species biomass + one per
+    # tracked metabolite. All panels advance in lockstep with the slider.
+    panels = []
     for i, sp in enumerate(species_ids):
-        field_buttons.append(
-            f'<button class="field-btn" data-field="biomass:{sp}" '
-            f'style="border-color:{SPECIES_PALETTE[i % len(SPECIES_PALETTE)]};'
-            f'color:{SPECIES_PALETTE[i % len(SPECIES_PALETTE)]};">'
-            f'{sp} biomass</button>')
+        col = SPECIES_PALETTE[i % len(SPECIES_PALETTE)]
+        r0, r1 = biomass_ranges[sp]
+        panels.append(
+            f'<div class="panel">'
+            f'  <div class="panel-title" style="color:{col};">'
+            f'    <span class="panel-dot" style="background:{col};"></span>'
+            f'    {sp} <span class="panel-sub">biomass (gDW/cell)</span></div>'
+            f'  <canvas class="panel-canvas" data-sid="{sid}" '
+            f'          data-field="biomass:{sp}"></canvas>'
+            f'  <div class="panel-range">'
+            f'    <span>{_fmt_sci(r0)}</span>'
+            f'    <span class="panel-grad" '
+            f'          style="background:linear-gradient(to right,{_biomass_css_gradient()});"></span>'
+            f'    <span>{_fmt_sci(r1)}</span></div>'
+            f'</div>'
+        )
     for i, m in enumerate(tracked):
-        field_buttons.append(
-            f'<button class="field-btn" data-field="media:{m}" '
-            f'style="border-color:{MEDIA_PALETTE[i % len(MEDIA_PALETTE)]};'
-            f'color:{MEDIA_PALETTE[i % len(MEDIA_PALETTE)]};">'
-            f'{m}</button>')
-    field_buttons_html = '\n        '.join(field_buttons)
+        col = MEDIA_PALETTE[i % len(MEDIA_PALETTE)]
+        r0, r1 = media_ranges[m]
+        panels.append(
+            f'<div class="panel">'
+            f'  <div class="panel-title" style="color:{col};">'
+            f'    <span class="panel-dot" style="background:{col};"></span>'
+            f'    {m} <span class="panel-sub">(mmol/cell)</span></div>'
+            f'  <canvas class="panel-canvas" data-sid="{sid}" '
+            f'          data-field="media:{m}"></canvas>'
+            f'  <div class="panel-range">'
+            f'    <span>{_fmt_sci(r0)}</span>'
+            f'    <span class="panel-grad" '
+            f'          style="background:linear-gradient(to right,{_media_css_gradient()});"></span>'
+            f'    <span>{_fmt_sci(r1)}</span></div>'
+            f'</div>'
+        )
+    panels_html = '\n'.join(panels)
 
     section = f"""
 <div class="sim-section" id="sim-{sid}">
@@ -599,9 +696,9 @@ def _spatial_section_html(idx, cfg, snapshots, runtime, all_js_data):
       <span class="metric-sub">{nx*ny} cells</span></div>
     <div class="metric"><span class="metric-label">Cell size</span>
       <span class="metric-value">{cfg['spatial_config'].get('space_width', 0.05)*10:.1f} mm</span></div>
-    <div class="metric"><span class="metric-label">Snapshots</span>
-      <span class="metric-value">{len(snapshots)}</span>
-      <span class="metric-sub">Δt {cfg['total_time']/cfg['n_snapshots']:.2f} hr</span></div>
+    <div class="metric"><span class="metric-label">Duration</span>
+      <span class="metric-value">{cfg['total_time']:.0f} hr</span>
+      <span class="metric-sub">{len(snapshots)} snapshots</span></div>
     <div class="metric"><span class="metric-label">Biomass gain</span>
       <span class="metric-value">{b_pct}</span>
       <span class="metric-sub">{b_init:.2e} → {b_final:.2e}</span></div>
@@ -611,29 +708,18 @@ def _spatial_section_html(idx, cfg, snapshots, runtime, all_js_data):
       <span class="metric-value">{runtime:.1f}s</span></div>
   </div>
 
-  <h3 class="subsection-title">2D Field Viewer</h3>
-  <div class="field-toggle">
-    {field_buttons_html}
+  <h3 class="subsection-title">2D Field Viewer &mdash; biomass and substrates together</h3>
+  <div class="panel-row">
+    {panels_html}
   </div>
-  <div class="heat-viewer-wrap">
-    <div class="heat-canvas-box">
-      <canvas id="heat-{sid}" class="heat-canvas"></canvas>
-      <div class="heat-colorbar">
-        <div class="cb-title"><span id="cb-title-{sid}">biomass</span></div>
-        <div class="cb-val" id="cb-max-{sid}">1.00</div>
-        <div class="cb-gradient" id="cb-grad-{sid}"></div>
-        <div class="cb-val" id="cb-min-{sid}">0.00</div>
-      </div>
-    </div>
-    <div class="slider-controls">
-      <button class="play-btn" style="border-color:{cs['primary']}; color:{cs['primary']};"
-              onclick="toggleSpatialPlay('{sid}')" id="play-{sid}">Play</button>
-      <label>Time</label>
-      <input type="range" class="time-slider" id="slider-{sid}"
-             min="0" max="{len(snapshots)-1}" value="0" step="1"
-             style="accent-color:{cs['primary']};">
-      <span class="time-val" id="tval-{sid}">t = 0.00 hr</span>
-    </div>
+  <div class="panel-controls">
+    <button class="play-btn" style="border-color:{cs['primary']}; color:{cs['primary']};"
+            onclick="toggleSpatialPlay('{sid}')" id="play-{sid}">Play</button>
+    <label>Time</label>
+    <input type="range" class="time-slider" id="slider-{sid}"
+           min="0" max="{len(snapshots)-1}" value="0" step="1"
+           style="accent-color:{cs['primary']};">
+    <span class="time-val" id="tval-{sid}">t = 0.00 hr</span>
   </div>
 
   <h3 class="subsection-title">Aggregate Dynamics</h3>
@@ -880,37 +966,35 @@ body {{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-seri
 .section-banner p {{ color:#475569; font-size:.9rem; max-width:860px; }}
 .section-banner code {{ background:#fff; padding:.1rem .35rem; border-radius:4px;
                         color:#0ea5e9; font-size:.85em; }}
-/* 2D heatmap viewer */
-.field-toggle {{ display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:.7rem; }}
-.field-btn {{ background:#fff; border:1.5px solid; border-radius:7px;
-              padding:.3rem .75rem; font-size:.78rem; font-weight:600;
-              cursor:pointer; transition:all .15s; }}
-.field-btn:hover {{ transform:translateY(-1px); }}
-.field-btn.active {{ background:currentColor; }}
-.field-btn.active {{ color:#fff !important; }}
-.heat-viewer-wrap {{ position:relative; background:#ffffff;
-                     border:1px solid #e2e8f0; border-radius:14px;
-                     padding:1.5rem; margin-bottom:1rem;
-                     display:flex; flex-direction:column; align-items:center; }}
-.heat-canvas-box {{ position:relative; }}
-.heat-canvas {{ display:block; border-radius:6px;
-                box-shadow:0 1px 3px rgba(15,23,42,0.06);
-                image-rendering:pixelated; image-rendering:crisp-edges; }}
-.heat-colorbar {{ position:absolute; top:.5rem; right:-4.2rem;
-                  background:#fff; border:1px solid #e2e8f0; border-radius:8px;
-                  padding:.6rem;
-                  display:flex; flex-direction:column; align-items:center; gap:.2rem; }}
+/* 2D multi-panel viewer — one small heatmap per field, all in a row */
+.panel-row {{ display:flex; flex-wrap:wrap; gap:1rem; justify-content:center;
+              background:#ffffff; border:1px solid #e2e8f0; border-radius:14px;
+              padding:1.25rem; margin-bottom:.75rem; }}
+.panel {{ display:flex; flex-direction:column; gap:.4rem; align-items:center; }}
+.panel-title {{ font-size:.82rem; font-weight:700; display:flex;
+                align-items:center; gap:.4rem; font-family:'SF Mono',Menlo,monospace;
+                text-align:center; }}
+.panel-dot {{ width:.5rem; height:.5rem; border-radius:50%; }}
+.panel-sub {{ color:#94a3b8; font-size:.7rem; font-weight:500; letter-spacing:.02em; }}
+.panel-canvas {{ display:block; border-radius:4px;
+                 box-shadow:0 1px 3px rgba(15,23,42,0.08);
+                 image-rendering:pixelated; image-rendering:crisp-edges;
+                 background:#fafafa; }}
+.panel-range {{ display:flex; align-items:center; gap:.45rem;
+                font-size:.65rem; color:#475569; font-family:'SF Mono',Menlo,monospace;
+                font-variant-numeric:tabular-nums; width:100%; }}
+.panel-grad {{ flex:1; height:9px; border-radius:2px;
+               border:1px solid #e2e8f0; }}
+.panel-controls {{ margin:0 auto 1rem auto; padding:.6rem 1rem;
+                   background:#f8fafc; border:1px solid #e2e8f0;
+                   border-radius:10px; display:flex;
+                   align-items:center; gap:.8rem; color:#334155;
+                   max-width:720px; }}
+.panel-controls label {{ font-size:.8rem; color:#64748b; }}
 @media(max-width:900px) {{
   .charts-row, .pbg-row {{ grid-template-columns:1fr; }}
   .sim-section, .page-header, .section-banner {{ padding:1.5rem; }}
 }}
-/* Slider controls — light theme, sits beneath the centered canvas */
-.slider-controls {{ margin-top:1rem; padding:.6rem 1rem;
-                    background:#f8fafc; border:1px solid #e2e8f0;
-                    border-radius:10px; display:flex;
-                    align-items:center; gap:.8rem; color:#334155;
-                    width:100%; max-width:560px; }}
-.slider-controls label {{ font-size:.8rem; color:#64748b; }}
 .time-slider {{ flex:1; height:5px; }}
 .time-val {{ font-size:.9rem; font-weight:600; color:#0f172a; min-width:110px;
              text-align:right; font-variant-numeric:tabular-nums; }}
@@ -1101,34 +1185,25 @@ Object.keys(DATA).forEach(sid => {{
   }}, pCfg);
 }});
 
-// ─── Spatial 2D Heatmap Viewers ───
-const spatialState = {{}};  // sid -> {{ field, step, playing, intervalId }}
+// ─── Spatial 2D Multi-Panel Viewers ───
+// Each spatial config renders a row of small heatmap panels (one per species
+// biomass + one per tracked metabolite). All panels advance in lockstep with
+// the shared time slider / play button.
+const spatialState = {{}};  // sid -> {{ step, playing, intervalId, panels: [...] }}
 
-// Simple turbo-like colormap for biomass (dark -> yellow) and blue-to-yellow for media.
-function colormapBiomass(t) {{
+// Colormap stops — must match Python-side generators used for the static
+// gradient bars beneath each panel.
+const BIOMASS_STOPS = [
+  [0.961, 0.969, 0.992], [0.765, 0.780, 0.949], [0.489, 0.517, 0.886],
+  [0.353, 0.307, 0.761], [0.655, 0.241, 0.682], [0.918, 0.310, 0.278],
+  [0.992, 0.647, 0.153], [0.996, 0.902, 0.278],
+];
+const MEDIA_STOPS = [
+  [0.973, 0.988, 0.996], [0.753, 0.902, 0.945], [0.408, 0.784, 0.851],
+  [0.086, 0.569, 0.686], [0.051, 0.333, 0.537], [0.031, 0.184, 0.376],
+];
+function interpStops(stops, t) {{
   t = Math.max(0, Math.min(1, t));
-  // viridis-ish stops: #0f172a -> #312e81 -> #7c3aed -> #dc2626 -> #f97316 -> #fde047
-  const stops = [
-    [0.06,0.09,0.16], [0.19,0.18,0.51], [0.49,0.23,0.93],
-    [0.86,0.15,0.15], [0.98,0.45,0.09], [0.99,0.88,0.28],
-  ];
-  const seg = t * (stops.length - 1);
-  const i = Math.min(stops.length - 2, Math.floor(seg));
-  const f = seg - i;
-  const a = stops[i], b = stops[i+1];
-  return [
-    (a[0] + (b[0]-a[0])*f) * 255,
-    (a[1] + (b[1]-a[1])*f) * 255,
-    (a[2] + (b[2]-a[2])*f) * 255,
-  ];
-}}
-function colormapMedia(t) {{
-  t = Math.max(0, Math.min(1, t));
-  // dark -> teal -> white
-  const stops = [
-    [0.06,0.09,0.16], [0.03,0.15,0.38], [0.02,0.28,0.55],
-    [0.08,0.50,0.70], [0.35,0.78,0.82], [0.92,0.97,0.99],
-  ];
   const seg = t * (stops.length - 1);
   const i = Math.min(stops.length - 2, Math.floor(seg));
   const f = seg - i;
@@ -1140,46 +1215,29 @@ function colormapMedia(t) {{
   ];
 }}
 
-function drawHeatmap(sid) {{
-  const d = DATA[sid];
+function drawPanel(panel, step) {{
+  const d = DATA[panel.sid];
   if (!d || d.kind !== 'spatial') return;
-  const st = spatialState[sid];
-  const canvas = document.getElementById('heat-' + sid);
-  if (!canvas) return;
-  const [nx, ny] = d.grid;
-  // Fit the heatmap into a square ~460x460 box, centered in its container.
-  const target = 460;
-  const cellPx = Math.max(4, Math.floor(target / Math.max(nx, ny)));
-  const W = nx * cellPx;
-  const H = ny * cellPx;
-  canvas.width = W * window.devicePixelRatio;
-  canvas.height = H * window.devicePixelRatio;
-  canvas.style.width = W + 'px';
-  canvas.style.height = H + 'px';
-  const ctx = canvas.getContext('2d');
-  ctx.imageSmoothingEnabled = false;
-  ctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
-
-  const [kind, name] = st.field.split(':');
-  let grid, range, cmap;
+  const [kind, name] = panel.field.split(':');
+  let grid, range, stops;
   if (kind === 'biomass') {{
-    grid = d.biomass_grid[name][st.step];
+    grid = d.biomass_grid[name][step];
     range = d.biomass_ranges[name];
-    cmap = colormapBiomass;
+    stops = BIOMASS_STOPS;
   }} else {{
-    grid = d.media_grid[name][st.step];
+    grid = d.media_grid[name][step];
     range = d.media_ranges[name];
-    cmap = colormapMedia;
+    stops = MEDIA_STOPS;
   }}
+  const [nx, ny] = d.grid;
+  const {{ canvas, cellPx, W, H, ctx }} = panel;
   const vmin = range[0], vmax = range[1];
-
   const img = ctx.createImageData(W, H);
   for (let iy = 0; iy < ny; iy++) {{
     for (let ix = 0; ix < nx; ix++) {{
       const v = grid[ix][iy];
       const t = (v - vmin) / (vmax - vmin + 1e-18);
-      const [r, g, b] = cmap(t);
-      // Paint a cellPx x cellPx block
+      const [r, g, b] = interpStops(stops, t);
       for (let py = 0; py < cellPx; py++) {{
         for (let px = 0; px < cellPx; px++) {{
           const X = ix * cellPx + px;
@@ -1194,28 +1252,13 @@ function drawHeatmap(sid) {{
     }}
   }}
   ctx.putImageData(img, 0, 0);
+}}
 
-  // Update colorbar + time text
-  const cbMin = document.getElementById('cb-min-' + sid);
-  const cbMax = document.getElementById('cb-max-' + sid);
-  const cbGrad = document.getElementById('cb-grad-' + sid);
-  const cbTitle = document.getElementById('cb-title-' + sid);
-  const fmt = v => Math.abs(v) >= 0.01 || v === 0
-    ? v.toFixed(2) : v.toExponential(1);
-  if (cbMin) cbMin.textContent = fmt(vmin);
-  if (cbMax) cbMax.textContent = fmt(vmax);
-  if (cbTitle) cbTitle.textContent = kind + ':' + name;
-  // Paint the gradient bar with the chosen colormap
-  if (cbGrad) {{
-    const stops = [];
-    for (let k = 0; k <= 10; k++) {{
-      const t = k / 10;
-      const [r, g, b] = cmap(1 - t);  // top = max
-      stops.push('rgb(' + r.toFixed(0) + ',' + g.toFixed(0) + ',' + b.toFixed(0) + ') ' + (t*100).toFixed(0) + '%');
-    }}
-    cbGrad.style.background = 'linear-gradient(to bottom, ' + stops.join(', ') + ')';
-  }}
-  // Time label
+function drawAllPanels(sid) {{
+  const st = spatialState[sid];
+  if (!st) return;
+  st.panels.forEach(p => drawPanel(p, st.step));
+  const d = DATA[sid];
   const tv = document.getElementById('tval-' + sid);
   if (tv) tv.textContent = 't = ' + d.times[st.step].toFixed(2) + ' hr';
 }}
@@ -1231,7 +1274,7 @@ function toggleSpatialPlay(sid) {{
     st.intervalId = setInterval(() => {{
       st.step = (st.step + 1) % d.times.length;
       slider.value = st.step;
-      drawHeatmap(sid);
+      drawAllPanels(sid);
     }}, 140);
   }} else {{
     btn.textContent = 'Play';
@@ -1239,34 +1282,46 @@ function toggleSpatialPlay(sid) {{
   }}
 }}
 
+// Size panels so that a full row of them fits across the screen:
+//   targetPanelPx picks cellPx = max(4, floor(targetPanelPx / grid_max))
+function makePanel(canvasEl, targetPanelPx) {{
+  const sid = canvasEl.dataset.sid;
+  const field = canvasEl.dataset.field;
+  const d = DATA[sid];
+  const [nx, ny] = d.grid;
+  const cellPx = Math.max(4, Math.floor(targetPanelPx / Math.max(nx, ny)));
+  const W = nx * cellPx;
+  const H = ny * cellPx;
+  canvasEl.width  = W * window.devicePixelRatio;
+  canvasEl.height = H * window.devicePixelRatio;
+  canvasEl.style.width  = W + 'px';
+  canvasEl.style.height = H + 'px';
+  const ctx = canvasEl.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+  return {{ sid, field, canvas:canvasEl, cellPx, W, H, ctx }};
+}}
+
 // Initialize each spatial viewer
 Object.keys(DATA).forEach(sid => {{
   const d = DATA[sid];
   if (d.kind !== 'spatial') return;
-  const firstField = d.species_ids.length > 0
-    ? 'biomass:' + d.species_ids[0]
-    : 'media:' + d.media_ids[0];
-  spatialState[sid] = {{ field: firstField, step: 0, playing: false,
-                         intervalId: null }};
 
-  // Hook up field toggle buttons
-  document.querySelectorAll('#sim-' + sid + ' .field-btn').forEach(btn => {{
-    const f = btn.dataset.field;
-    if (f === firstField) btn.classList.add('active');
-    btn.addEventListener('click', () => {{
-      document.querySelectorAll('#sim-' + sid + ' .field-btn').forEach(b =>
-        b.classList.remove('active'));
-      btn.classList.add('active');
-      spatialState[sid].field = f;
-      drawHeatmap(sid);
-    }});
-  }});
+  // Gather every canvas belonging to this config's panel row and build its
+  // rendering state. Choose a target size that lets the row fit comfortably.
+  const canvases = Array.from(
+    document.querySelectorAll('#sim-' + sid + ' .panel-canvas'));
+  const n = canvases.length;
+  // Aim for a row total of roughly 1100px.
+  const targetPanelPx = Math.max(180, Math.min(260, Math.floor(1100 / n)));
+  const panels = canvases.map(c => makePanel(c, targetPanelPx));
+  spatialState[sid] = {{ step: 0, playing: false, intervalId: null, panels }};
 
   // Hook up slider
   const slider = document.getElementById('slider-' + sid);
   slider.addEventListener('input', () => {{
     spatialState[sid].step = parseInt(slider.value);
-    drawHeatmap(sid);
+    drawAllPanels(sid);
   }});
 
   // Aggregate charts
@@ -1292,7 +1347,7 @@ Object.keys(DATA).forEach(sid => {{
     showlegend:true,
   }}, pCfg);
 
-  drawHeatmap(sid);
+  drawAllPanels(sid);
 }});
 </script>
 </body>

@@ -2,6 +2,8 @@
 
 Process-bigraph wrapper for [COMETS](https://github.com/segrelab/comets) (Computation Of Microbial Ecosystems in Time and Space) and its Python interface [cometspy](https://github.com/segrelab/cometspy). Also ships a pure-Python dynamic-FBA process that works without the COMETS Java backend, for lightweight simulations and self-contained demos.
 
+**[View Interactive Demo Report](https://vivarium-collective.github.io/pbg-comets/)** &mdash; three canonical COMETS benchmarks (virtual test tube, virtual petri dish, Harcombe-style cross-feeding) with interactive 2D field videos showing biomass and substrates evolving side-by-side.
+
 ## What it does
 
 Exposes three `process-bigraph` Processes that run microbial community simulations at the level of **constraint-based metabolism** — genome-scale FBA coupled to time-dependent biomass and media dynamics:

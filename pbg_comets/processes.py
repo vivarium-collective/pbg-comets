@@ -653,7 +653,16 @@ class SpatialDynamicFBAProcess(Process):
         return -float(flux)
 
     def _react_step(self, dt: float):
-        """Apply one reactive Euler step per cell (no diffusion)."""
+        """Apply one reactive Euler step per cell (no diffusion).
+
+        Uptake bounds are computed from Michaelis-Menten kinetics AND then
+        capped by per-step mass-balance: a cell with biomass ``b`` cannot
+        consume more than ``local_amount / (b * dt)`` mmol per gDW per hr
+        of any substrate in a single step. Without this cap, MM saturation
+        at physically absurd local concentrations (single cells are ~4e-8 L)
+        lets FBA "over-consume" relative to the true local substrate pool;
+        diffusion then replenishes, and biomass grows unbounded.
+        """
         cfg = self.config
         death = cfg['death_rate']
         min_b = cfg['min_biomass']
@@ -673,14 +682,22 @@ class SpatialDynamicFBAProcess(Process):
             for x, y in active:
                 b = float(field[x, y])
 
-                # Set MM uptake bounds from local media
+                # Set MM uptake bounds from local media — capped by
+                # mass-balance so no cell consumes more than is present.
+                budget_denom = b * dt if (b > 0 and dt > 0) else 0.0
                 for ex_id, (rxn_id, default_lb, _) in ex_map.items():
                     if default_lb >= 0:
                         continue
                     key = self._strip_compartment(ex_id)
                     local_amount = float(self._media_fields[key][x, y])
-                    target_lb = max(default_lb,
-                                    self._local_uptake_bound(sid, key, local_amount))
+                    mm_lb = self._local_uptake_bound(sid, key, local_amount)
+                    target_lb = max(default_lb, mm_lb)
+                    if budget_denom > 0 and local_amount > 0:
+                        max_consumable_rate = local_amount / budget_denom
+                        if -target_lb > max_consumable_rate:
+                            target_lb = -max_consumable_rate
+                    elif budget_denom > 0 and local_amount <= 0:
+                        target_lb = 0.0
                     rxn = model.reactions.get_by_id(rxn_id)
                     rxn.lower_bound = float(target_lb)
 
