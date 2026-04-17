@@ -1102,6 +1102,7 @@ const pCfg = {{ responsive:true, displayModeBar:false }};
 
 Object.keys(DATA).forEach(sid => {{
   const d = DATA[sid];
+  if (d.kind === 'spatial') return;  // spatial entries are rendered below
 
   // Biomass (log-ish linear lines, one per species)
   const biomassTraces = d.species_ids.map((sp, i) => ({{
