@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pbg-comets"
+version = "0.1.0"
+description = "Process-bigraph wrapper for COMETS (spatial dynamic FBA for microbial ecosystems)"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "process-bigraph>=0.0.10",
+    "bigraph-schema",
+    "cometspy>=0.6.0",
+    "cobra>=0.29.0",
+    "numpy",
+    "pandas",
+    "scipy",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "bigraph-viz", "plotly"]
+
+[tool.setuptools.packages.find]
+include = ["pbg_comets*"]
