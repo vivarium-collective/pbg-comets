@@ -1,5 +1,6 @@
 name: dfba-textbook-demo
 description: "Tiny well-mixed dynamic FBA demo using cobra's `textbook` E. coli model. Each step solves FBA with Michaelis-Menten uptake bounds, updates biomass/media by explicit Euler, and emits scalar + map signals."
+tags: [fba, metabolism, multi-cell, demo]
 
 requires:
   processes: [DynamicFBAProcess, RAMEmitter]

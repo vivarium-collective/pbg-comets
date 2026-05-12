@@ -1,5 +1,6 @@
 name: dfba-textbook-with-viz
 description: "Dynamic FBA demo with a wired Visualization Step. Each update produces a Plotly HTML figure of the running scalar + per-species trajectories, written to the 'viz_html' store."
+tags: [fba, metabolism, multi-cell, demo, visualization]
 
 requires:
   processes: [DynamicFBAProcess, DynamicFBAPlots, RAMEmitter]
