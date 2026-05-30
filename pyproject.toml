@@ -7,7 +7,7 @@ name = "pbg-comets"
 version = "0.1.0"
 description = "Process-bigraph wrapper for COMETS (spatial dynamic FBA for microbial ecosystems)"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 dependencies = [
     "process-bigraph>=0.0.10",
     "bigraph-schema",
